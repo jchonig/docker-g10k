@@ -1,7 +1,5 @@
 #!/usr/bin/with-contenv bash
 
-set -x
-
 # load env file if it exists
 if [ -f "/config/env" ]; then
     source /config/env
@@ -9,9 +7,10 @@ if [ -f "/config/env" ]; then
 fi
 
 # make our config dirs
-for dir in cache; do
-    mkdir -p /etc/puppetlabs/code/${dir}
+for dir in cache environments modules; do
+    test -e /etc/puppetlabs/code/${dir} || mkdir -p /etc/puppetlabs/code/${dir}
     chown -R abc.abc /etc/puppetlabs/code/${dir}
+    chmod ug+rwX,o+rX /etc/puppetlabs/code/${dir}
 done
 
 date
