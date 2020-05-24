@@ -21,7 +21,7 @@ if [[ $REF =~ 'refs/heads/' ]]; then
   branch=$(cut -d/ -f3 <<<"${REF}")
   /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
   if [ -x ./notify ]; then
-     echo "Sending notification with ${HOME}/notify"
+     echo "Sending notification with '${PWD}/notify $? ${branch} ${REMOTE}'"
      ./notify $? ${branch} ${REMOTE}
   fi
 else
