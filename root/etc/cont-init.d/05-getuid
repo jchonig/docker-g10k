@@ -15,8 +15,8 @@ while true; do
 done
 
 if [ -n "${PUID}" ]; then
-    PUID=$puid
+    export PUID=$puid
 fi
 if [ -n "${PGID}" ]; then
-   PGID=$pgid
+   export PGID=$pgid
 fi
