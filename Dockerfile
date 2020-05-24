@@ -25,7 +25,7 @@ RUN \
 	install -m 755 webhook-linux-amd64/webhook /usr/local/bin && \
 	rm -rf webhook-linux-amd64* \
     echo "*** install pushbullet script" && \
-        curl -L https://raw.githubusercontent.com/jchonig/pushbullet/master/pushbullet && \
+        curl -L https://raw.githubusercontent.com/jchonig/pushbullet/master/pushbullet -o pushbullet && \
 	install -m 755 pushbullet /usr/local/bin && \
         rm pushbullet && \
     echo "**** clean up ****" && \

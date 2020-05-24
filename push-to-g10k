@@ -3,6 +3,8 @@
 REF="$1"
 REMOTE="$2"
 
+export HOME=/config
+
 r10kconf="$(mktemp)"
 trap "rm -f ${r10kconf}" 0 1 2 3 13 15
 
@@ -20,7 +22,10 @@ EOF
 if [[ $REF =~ 'refs/heads/' ]]; then
   branch=$(cut -d/ -f3 <<<"${REF}")
   /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-  test -x ${HOME}/notify && ${HOME}/notify $? ${branch} ${REMOTE} &
+  if [ -x ${HOME}/notify ]; then
+     echo "Sending notification with ${HOME}/notify"
+     ${HOME}/notify $? ${branch} ${REMOTE}
+  fi
 else
   echo "g10k skipping $REF"
 fi
