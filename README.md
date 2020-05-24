@@ -84,7 +84,7 @@ Host git.server.adddress.com
 	IdentitiesOnly yes
 	StrictHostKeyChecking no
 	UserKnownHostsFile /dev/null
-```
+```er
 
 ## Notification hooks
 
@@ -96,5 +96,13 @@ parameters:
   * Branch name
   * Repo URL
 
+### pushbullet script
+
+A script to send notifications to PushBullet lives in
+`/usr/local/bin/pushbullet` and can be invoked as:
+
+```
+/usr/local/bin/pushbullet --api-key APIKEY --title TITLE --note NODE
+```
 
 

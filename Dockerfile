@@ -14,7 +14,7 @@ WORKDIR /tmp
 RUN \
     echo "**** install packages ****" && \
 	apt update && \
-	apt -y install git unzip && \
+	apt -y install git unzip python3 python-is-python3 python3-requests && \
     echo "*** install g10k ****" && \
 	curl -L https://github.com/xorpaul/g10k/releases/download/v${G10K_VERSION}/g10k-linux-amd64.zip -o g10k-linux-amd64.zip && \
 	unzip g10k-linux-amd64.zip && \
@@ -24,6 +24,10 @@ RUN \
 	curl -L https://github.com/adnanh/webhook/releases/download/${WEBHOOK_VERSION}/webhook-linux-amd64.tar.gz | tar xzf - && \
 	install -m 755 webhook-linux-amd64/webhook /usr/local/bin && \
 	rm -rf webhook-linux-amd64* \
+    echo "*** install pushbullet script" && \
+        curl -L https://raw.githubusercontent.com/jchonig/pushbullet/master/pushbullet -o pushbullet && \
+	install -m 755 pushbullet /usr/local/bin && \
+        rm pushbullet && \
     echo "**** clean up ****" && \
 	apt purge -y unzip && \
 	apt clean && \
