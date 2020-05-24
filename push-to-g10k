@@ -20,9 +20,9 @@ EOF
 if [[ $REF =~ 'refs/heads/' ]]; then
   branch=$(cut -d/ -f3 <<<"${REF}")
   /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-  if [ -x ${HOME}/notify ]; then
-     echo "Sending notification with ${HOME}/notify"
-     ${HOME}/notify $? ${branch} ${REMOTE}
+  if [ -x ./notify ]; then
+     echo "Sending notification with '${PWD}/notify $? ${branch} ${REMOTE}'"
+     ./notify $? ${branch} ${REMOTE}
   fi
 else
   echo "g10k skipping $REF"
