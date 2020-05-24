@@ -20,3 +20,5 @@ fi
 if [ -n "${PGID}" ]; then
    export PGID=$pgid
 fi
+echo "    PUID=${PUID}"
+echo "    PGID=${PGID}"
