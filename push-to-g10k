@@ -3,8 +3,6 @@
 REF="$1"
 REMOTE="$2"
 
-export HOME=/config
-
 r10kconf="$(mktemp)"
 trap "rm -f ${r10kconf}" 0 1 2 3 13 15
 

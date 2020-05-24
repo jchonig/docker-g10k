@@ -1,6 +1,6 @@
 - id: github
   execute-command: /usr/local/lib/push-to-g10k
-  command-working-directory: /
+  command-working-directory: /config
   pass-arguments-to-command:
   - source: payload
     name: ref
@@ -17,7 +17,7 @@
 
 - id: gogs
   execute-command: /usr/local/lib/push-to-g10k
-  command-working-directory: /
+  command-working-directory: /config
   pass-arguments-to-command:
   - source: payload
     name: ref
@@ -34,7 +34,7 @@
 
 - id: gitlab
   execute-command: /usr/local/lib/push-to-g10k
-  command-working-directory: /
+  command-working-directory: /config
   pass-arguments-to-command:
   - source: payload
     name: ref
@@ -51,7 +51,7 @@
 
 - id: payload
   execute-command: /usr/local/lib/push-to-g10k
-  command-working-directory: /
+  command-working-directory: /config
   pass-arguments-to-command:
   - source: payload
     name: ref
