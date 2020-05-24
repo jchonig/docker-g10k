@@ -22,7 +22,7 @@ export PATH=/opt/puppetlabs/bin:$PATH
 if [[ $REF =~ 'refs/heads/' ]]; then
   branch=$(cut -d/ -f3 <<<"${REF}")
   /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-  rm -f "$r10kconf"
+  test -e ${HOME}/notify && ${HOME}/notify ${branch} ${REMOTE} &
 else
   echo "g10k skipping $REF"
 fi
