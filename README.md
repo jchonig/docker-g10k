@@ -7,7 +7,7 @@ build puppet environments.
 
 This is roughly derrived from
 [camptocamp/docker-g10k-webhook](https://github.com/camptocamp/docker-g10k-webhook),
-but runs a container based on (s6)[https://skarnet.org/software/s6/overview.html].
+but runs a container based on [s6](https://skarnet.org/software/s6/overview.html).
 
 # Usage
 
@@ -95,8 +95,6 @@ parameters:
   * Return code of the g10k command
   * Branch name
   * Repo URL
-
-# TODO
 
 
 
