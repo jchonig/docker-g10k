@@ -1,0 +1,19 @@
+#!/usr/bin/with-contenv bash
+
+# Get UID and GID of puppetserver from /etc/puppetlabs/code
+while true; do
+    puid=$(stat -c %u /etc/puppetlabs/code)
+    pgid=$(stat -c %g /etc/puppetlabs/code)
+    if [ $puid -ne 0 -a $pgid -ne 0 ]; then
+	break
+    fi
+    echo "/etc/puppetlabs/code owned by ${puid}.${pgid}, waiting...."
+    sleep 10
+done
+
+if [ -n "${PUID}" ]; then
+    PUID=$puid
+fi
+if [ -n "${PGID}" ]; then
+   PGID=$pgid
+fi
