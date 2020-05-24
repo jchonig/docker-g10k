@@ -2,6 +2,9 @@
 
 # Get UID and GID of puppetserver from /etc/puppetlabs/code
 while true; do
+    df -a
+    ls -FlasR /etc/puppetlabs/code /config
+    echo
     puid=$(stat -c %u /etc/puppetlabs/code)
     pgid=$(stat -c %g /etc/puppetlabs/code)
     if [ $puid -ne 0 -a $pgid -ne 0 ]; then
@@ -12,8 +15,10 @@ while true; do
 done
 
 if [ -n "${PUID}" ]; then
-    PUID=$puid
+    export PUID=$puid
 fi
 if [ -n "${PGID}" ]; then
-   PGID=$pgid
+   export PGID=$pgid
 fi
+echo "    PUID=${PUID}"
+echo "    PGID=${PGID}"
