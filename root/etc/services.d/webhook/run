@@ -1,4 +1,5 @@
 #!/usr/bin/with-contenv bash
 
-# Drop privileges and run M/Monit
+# Drop privileges and run webook
+
 s6-setuidgid abc /usr/local/bin/webhook -hooks /etc/webhook/g10k.yaml.tmpl -template -verbose
