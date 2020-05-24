@@ -19,7 +19,7 @@ RUN \
 	curl -L https://github.com/xorpaul/g10k/releases/download/v${G10K_VERSION}/g10k-linux-amd64.zip -o g10k-linux-amd64.zip && \
 	unzip g10k-linux-amd64.zip && \
 	install -m 755 g10k /usr/local/bin && \
-	rm g10k-linux-amd64.zip && \
+	rm g10k-linux-amd64.zip g10k && \
     echo "*** install webhook ****" && \
 	curl -L https://github.com/adnanh/webhook/releases/download/${WEBHOOK_VERSION}/webhook-linux-amd64.tar.gz | tar xzf - && \
 	install -m 755 webhook-linux-amd64/webhook /usr/local/bin && \
