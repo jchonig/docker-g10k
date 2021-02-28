@@ -84,7 +84,7 @@ Host git.server.adddress.com
 	IdentitiesOnly yes
 	StrictHostKeyChecking no
 	UserKnownHostsFile /dev/null
-```er
+```
 
 ## Notification hooks
 
