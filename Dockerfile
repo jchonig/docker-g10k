@@ -3,8 +3,8 @@ FROM lsiobase/ubuntu:focal
 ARG DEBIAN_FRONTEND=noninteractive
 
 ENV \
-	G10K_VERSION=0.8.9 \
-	WEBHOOK_VERSION=2.7.0 \
+	G10K_VERSION=0.8.16 \
+	WEBHOOK_VERSION=2.8.0 \
         HOOK_SECRET= \
 	TZ=UTC
 
