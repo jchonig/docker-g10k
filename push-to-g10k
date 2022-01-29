@@ -20,9 +20,18 @@ EOF
 if [[ $REF =~ 'refs/heads/' ]]; then
   branch=$(cut -d/ -f3 <<<"${REF}")
   /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-  if [ -x ./notify ]; then
-     echo "Sending notification with '${PWD}/notify $? ${branch} ${REMOTE}'"
-     ./notify $? ${branch} ${REMOTE}
+  rc=$?
+  if [ -f ./.apprise.yml -a -x /usr/bin/apprise ]; then
+     echo "Sending notification with apprise ${rc} ${branch} ${REMOTE}'"
+     if [ ${rc} -eq 0 ]; then
+	 title="G10K SUCCESS"
+     else
+	 title="G10 FAILED: ${rc}"
+     fi
+     /usr/bin/apprise --config ${PWD}/.apprise.yml --title "${title}" --body "Branch: ${branch}"
+  elif [ -x ./notify ]; then
+     echo "Sending notification with '${PWD}/notify ${rc} ${branch} ${REMOTE}'"
+     ./notify ${rc} ${branch} ${REMOTE}
   fi
 else
   echo "g10k skipping $REF"

@@ -86,23 +86,11 @@ Host git.server.adddress.com
 	UserKnownHostsFile /dev/null
 ```
 
-## Notification hooks
+## Notification of hook completion
 
-To send notifications on completions of g10k runs, create an
-executable file in `config/notify` that will be passed the following
-parameters:
+This container contains [apprise](https://github.com/caronc/apprise)
+which can send notifications via almost all notification services.
 
-  * Return code of the g10k command
-  * Branch name
-  * Repo URL
-
-### pushbullet script
-
-A script to send notifications to PushBullet lives in
-`/usr/local/bin/pushbullet` and can be invoked as:
-
-```
-/usr/local/bin/pushbullet --api-key APIKEY --title TITLE --note NODE
-```
-
+To send notifications on completions of g10k runs, create a
+`/config/.apprise.yml` that lists the urls to notify.
 
