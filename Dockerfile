@@ -20,7 +20,7 @@ FROM jchonig/webhook
 ENV \
         HOOK_SECRET= \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
-        HOOK_ARGS="-hooks /etc/webhook/g10k.yaml.tmpl -template -verbose" \
+        HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \
 	TZ=UTC
 
 WORKDIR /tmp
