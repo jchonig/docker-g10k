@@ -2,7 +2,7 @@
 A container running [g10k](https://github.com/xorpaul/g10k) and
 [webhook](https://github.com/adnanh/webhook).
 
-The purpose is to catch webhook posts from a git server and run g10 to
+The purpose is to catch webhook posts from a git server and run g10k to
 build puppet environments.
 
 This is roughly derrived from
