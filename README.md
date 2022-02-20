@@ -9,6 +9,8 @@ This is roughly derrived from
 [camptocamp/docker-g10k-webhook](https://github.com/camptocamp/docker-g10k-webhook),
 but runs a container based on [s6](https://skarnet.org/software/s6/overview.html).
 
+This image is layered on [jchonig/webhook](https://github.com/jchonig/g10k).
+
 # Usage
 
 ## docker
@@ -28,13 +30,14 @@ Compatible with docker-compose v2 schemas.
 
 ```
 ---
-version: "2"
+version: "3"
 services:
   monit:
     image: jchonig/g10k
     container_name: g10k
     environment:
-      - TZ=Europe/London
+      TZ: Europe/London
+      HOOK_SECRET: MYSHAREDSECRET
     volumes:
       - </path/to/appdata/config>:/config
 	  - /etc/puppetlabs/code:/etc/puppetlabs/code
