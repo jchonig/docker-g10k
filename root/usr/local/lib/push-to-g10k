@@ -1,38 +1,71 @@
 #!/bin/bash
 
-REF="$1"
-REMOTE="$2"
+REF="${1}"
+REMOTE="${2}"
+EVENT="${3}"
+
+CACHEDIR=/etc/puppetlabs/code/cache
+BASEDIR=/etc/puppetlabs/code/environments
 
 r10kconf="$(mktemp)"
 trap "rm -f ${r10kconf}" 0 1 2 3 13 15
 
+notify () {
+    local rc=${1}
+    local branch=${2}
+    local event
+
+    if [ -n "${3}" ]; then
+	event="${3} "
+    fi
+
+    if [ -f ./.apprise.yml -a -x /usr/bin/apprise ]; then
+        echo "Sending notification with apprise ${rc} ${branch} ${3}'"
+        if [ ${rc} -eq 0 ]; then
+	    local title="G10K ${event}SUCCESS"
+        else
+	    local title="G10 ${event}FAILED: ${rc}"
+        fi
+        /usr/bin/apprise --config ${PWD}/.apprise.yml --title "${title}" --body "Branch: ${branch}"
+    elif [ -x ./notify ]; then
+        echo "Sending notification with '${PWD}/notify ${rc} ${branch} ${3}'"
+        ./notify ${rc} ${branch} ${REMOTE}
+    fi
+}
+
 cat << EOF > $r10kconf
 # The location to use for storing cached Git repos
-:cachedir: '/etc/puppetlabs/code/cache'
+:cachedir: '${CACHEDIR}'
 
 # A list of git repositories to create
 :sources:
   :main:
     remote: '${REMOTE}'
-    basedir: '/etc/puppetlabs/code/environments'
+    basedir: '${BASEDIR}'
 EOF
 
+local branch
 if [[ $REF =~ 'refs/heads/' ]]; then
-  branch=$(cut -d/ -f3 <<<"${REF}")
-  /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-  rc=$?
-  if [ -f ./.apprise.yml -a -x /usr/bin/apprise ]; then
-     echo "Sending notification with apprise ${rc} ${branch} ${REMOTE}'"
-     if [ ${rc} -eq 0 ]; then
-	 title="G10K SUCCESS"
-     else
-	 title="G10 FAILED: ${rc}"
-     fi
-     /usr/bin/apprise --config ${PWD}/.apprise.yml --title "${title}" --body "Branch: ${branch}"
-  elif [ -x ./notify ]; then
-     echo "Sending notification with '${PWD}/notify ${rc} ${branch} ${REMOTE}'"
-     ./notify ${rc} ${branch} ${REMOTE}
-  fi
+    branch=$(cut -d/ -f3 <<<"${REF}")
+elif [ -n "${REF}" ]; then
+    branch="${REF}"
 else
-  echo "g10k skipping $REF"
+    echo "g10k empty reference ${REF}"
+    exit 1
 fi
+    
+case ${EVENT} in
+    ""|"push")
+        /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
+	notify "${?}" "${branch}" "${EVENT}"
+      ;;
+    "delete")
+	rm -rf "${BASEDIR}/${branch}"
+	notify "${?}" "${branch}" "${EVENT}"
+	;;
+    *)
+	echo "ignoring ${EVENT} event"
+	;;
+esac
+
+exit 0
