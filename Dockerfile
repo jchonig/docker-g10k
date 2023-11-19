@@ -2,7 +2,7 @@ FROM golang:alpine AS build
 
 ENV \
         CGO_ENABLED=0 \
-	G10K_VERSION=0.9.4
+	G10K_VERSION=0.9.8
 
 WORKDIR /src/
 RUN \
