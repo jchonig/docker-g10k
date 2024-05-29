@@ -2,7 +2,7 @@ FROM golang:alpine AS build
 
 ENV \
         CGO_ENABLED=0 \
-	G10K_VERSION=0.9.8
+	G10K_VERSION=0.9.9
 
 WORKDIR /src/
 RUN \
@@ -28,11 +28,8 @@ WORKDIR /tmp
 # Install apprise and dependencies
 RUN \
     echo "**** install packages ****" && \
-        apk add --no-cache cargo git libffi-dev openssh-client openssl-dev python3 python3-dev python3 py3-pip && \
-    echo "*** install apprise ****" && \
-      python3 -m pip install --upgrade pip setuptools && \
-      python3 -m pip install --upgrade --find-links https://wheel-index.linuxserver.io/alpine/ apprise && \
-      rm -rf ${HOME}/.cargo
+        apk add --no-cache git openssh-client && \
+        apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing apprise
 
 COPY root /
 COPY --from=build /usr/local/bin/g10k /usr/local/bin/g10k
