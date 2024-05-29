@@ -44,7 +44,6 @@ cat << EOF > $r10kconf
     basedir: '${BASEDIR}'
 EOF
 
-local branch
 if [[ $REF =~ 'refs/heads/' ]]; then
     branch=$(cut -d/ -f3 <<<"${REF}")
 elif [ -n "${REF}" ]; then
