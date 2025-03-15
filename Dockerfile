@@ -28,8 +28,7 @@ WORKDIR /tmp
 # Install apprise and dependencies
 RUN \
     echo "**** install packages ****" && \
-        apk add --no-cache git openssh-client && \
-        apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing apprise
+        apk add --no-cache git apprise openssh-client
 
 COPY root /
 COPY --from=build /usr/local/bin/g10k /usr/local/bin/g10k
