@@ -52,19 +52,33 @@ else
     echo "g10k empty reference ${REF}"
     exit 1
 fi
-    
-case ${EVENT} in
+
+# Gitlab hooks return after as the third argument.  If it is all zeros, this is a delete
+if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]]; then
+    case ${BASH_REMATCH[0]} in
+        "0000000000000000000000000000000000000000")
+            event="delete"
+            ;;
+        *)
+            event="push"
+            ;;
+    esac
+else
+    event="${EVENT}"
+fi
+
+case ${event} in
     ""|"push")
         /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
-	notify "${?}" "${branch}" "${EVENT}"
+        notify "${?}" "${branch}" "${event}"
       ;;
     "delete")
-	rm -rf "${BASEDIR}/${branch}"
-	notify "${?}" "${branch}" "${EVENT}"
-	;;
+        rm -rf "${BASEDIR}/${branch}"
+        notify "${?}" "${branch}" "${event}"
+        ;;
     *)
-	echo "ignoring ${EVENT} event"
-	;;
+        echo "ignoring ${event} event"
+        ;;
 esac
 
 exit 0
