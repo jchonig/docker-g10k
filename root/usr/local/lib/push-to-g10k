@@ -74,7 +74,7 @@ EOF
 
     /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
     local rc=$?
-    rm -f "${staging}"
+    rm -rf "${staging}"
 
     if [ $rc -ne 0 ]; then
         echo "g10k failed for branch ${branch}, aborting deploy" >&2
@@ -86,6 +86,7 @@ EOF
     local tmplnk
     tmplnk=$(mktemp -u "${BASEDIR}/.staging.${branch}.XXXXXX")
     ln -s "${newdir}" "${tmplnk}"
+    echo "Atomically deploying ${branch} from ${newdir}"
     mv -T "${tmplnk}" "${live}"
     local mv_rc=$?
 

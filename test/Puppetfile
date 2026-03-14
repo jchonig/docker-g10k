@@ -1,0 +1,24 @@
+forge "https://forgeapi.puppetlabs.com"
+mod 'camptocamp/augeas', :latest
+mod 'cygnus-disk_facter', '0.3.2'
+mod 'deric-smartd', '2.1.0'
+mod 'ethanhs-snapd', :latest
+mod 'goldyfruit-grub2', :latest
+mod 'puppet-kmod', :latest
+mod 'puppet-lldpd', :latest
+mod 'puppet-logrotate', :latest
+mod 'puppet-postfix', :latest
+mod 'puppet-systemd', :latest
+mod 'puppet-unattended_upgrades', :latest
+mod 'puppetlabs-apt', '10.0.1'
+mod 'puppetlabs-concat', :latest
+mod 'puppetlabs-docker', :latest
+mod 'puppetlabs-inifile', '5.4.1'
+mod 'puppetlabs-mailalias_core', :latest
+mod 'puppetlabs-puppet_agent', :latest
+mod 'puppetlabs-stdlib', :latest
+mod 'puppetlabs-vcsrepo', :latest
+mod 'saz-locales', :latest
+mod 'saz-ssh', :latest
+mod 'saz-timezone', :latest
+mod 'stm-debconf', :latest

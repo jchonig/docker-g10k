@@ -16,8 +16,11 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -d --name g10k-test -e HOOK_SECRET=testsecret docker-g10k:test
-          sleep 3
+          docker run -d --name g10k-test \
+            -e HOOK_SECRET=testsecret \
+            -p 9000:9000 \
+            docker-g10k:test
+          sleep 5
 
       - name: Verify webhook process is running
         run: docker exec g10k-test pgrep webhook
@@ -81,6 +84,109 @@ jobs:
               echo "PASS: empty ref correctly rejected"
             fi
           '
+
+      # Test HTTP 200 for github/gogs/payload first, before the puppet repo exists.
+      # These fire push-to-g10k asynchronously; we only verify the webhook accepted
+      # the request (HTTP 200). The g10k runs will fail fast against the missing repo.
+
+      - name: Test github webhook format (HTTP 200)
+        run: |
+          PAYLOAD='{"ref":"refs/heads/production","repository":{"ssh_url":"file:///tmp/puppet.git"}}'
+          SIG=$(printf '%s' "${PAYLOAD}" | openssl dgst -sha1 -hmac "testsecret" | awk '{print "sha1=" $2}')
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -H "Content-Type: application/json" \
+            -H "X-Hub-Signature: ${SIG}" \
+            -d "${PAYLOAD}" \
+            http://localhost:9000/hooks/github)
+          [ "${HTTP}" = "200" ] || { echo "FAIL: github hook returned HTTP ${HTTP}"; exit 1; }
+          echo "PASS: github hook returned HTTP 200"
+
+      - name: Test gogs webhook format (HTTP 200)
+        run: |
+          PAYLOAD='{"ref":"refs/heads/production","repository":{"ssh_url":"file:///tmp/puppet.git"}}'
+          SIG=$(printf '%s' "${PAYLOAD}" | openssl dgst -sha256 -hmac "testsecret" | awk '{print $2}')
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -H "Content-Type: application/json" \
+            -H "X-Gogs-Signature: ${SIG}" \
+            -H "X-Gogs-Event: push" \
+            -d "${PAYLOAD}" \
+            http://localhost:9000/hooks/gogs)
+          [ "${HTTP}" = "200" ] || { echo "FAIL: gogs hook returned HTTP ${HTTP}"; exit 1; }
+          echo "PASS: gogs hook returned HTTP 200"
+
+      - name: Test payload webhook format (HTTP 200)
+        run: |
+          PAYLOAD='{"ref":"refs/heads/production","repository":{"ssh_url":"file:///tmp/puppet.git"},"secret":"testsecret"}'
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -H "Content-Type: application/json" \
+            -d "${PAYLOAD}" \
+            http://localhost:9000/hooks/payload)
+          [ "${HTTP}" = "200" ] || { echo "FAIL: payload hook returned HTTP ${HTTP}"; exit 1; }
+          echo "PASS: payload hook returned HTTP 200"
+
+      # Set up the puppet repo and environments-staging before the gitlab test,
+      # which verifies a real end-to-end deployment without racing other runs.
+
+      - name: Create environments-staging directory
+        run: |
+          docker exec g10k-test mkdir -p /etc/puppetlabs/code/environments-staging
+          docker exec g10k-test chown abc:abc /etc/puppetlabs/code/environments-staging
+
+      - name: Set up test puppet repo
+        run: |
+          docker exec g10k-test bash -c '
+            git config --global user.email "test@example.com"
+            git config --global user.name "Test"
+            mkdir -p /tmp/puppet-work
+            cd /tmp/puppet-work
+            git init
+            git checkout -b production
+          '
+          docker cp test/Puppetfile g10k-test:/tmp/puppet-work/Puppetfile
+          docker exec g10k-test bash -c '
+            cd /tmp/puppet-work
+            git add Puppetfile
+            git commit -m "Test Puppetfile"
+            git clone --bare . /tmp/puppet.git
+            rm -rf /tmp/puppet-work
+          '
+
+      - name: Test gitlab webhook format and verify deployment
+        run: |
+          PAYLOAD='{"ref":"refs/heads/production","repository":{"git_ssh_url":"file:///tmp/puppet.git"},"after":"abc123def456abc123def456abc123def456abc1"}'
+          # Capture log position before firing so we only watch new output
+          LOG_OFFSET=$(docker logs g10k-test 2>&1 | wc -l)
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST -H "Content-Type: application/json" \
+            -H "X-Gitlab-Token: testsecret" \
+            -d "${PAYLOAD}" \
+            http://localhost:9000/hooks/gitlab)
+          [ "${HTTP}" = "200" ] || { echo "FAIL: gitlab hook returned HTTP ${HTTP}"; exit 1; }
+          echo "PASS: gitlab hook returned HTTP 200, waiting for deployment..."
+          # Poll new log lines for success or failure (allow 3 min)
+          PREV_OFFSET=${LOG_OFFSET}
+          for i in $(seq 1 18); do
+            # Print any new container log lines so progress is visible
+            CUR_COUNT=$(docker logs g10k-test 2>&1 | wc -l | tr -d ' ')
+            if [ "${CUR_COUNT}" -gt "${PREV_OFFSET}" ]; then
+              docker logs g10k-test 2>&1 | tail -n +$((PREV_OFFSET + 1)) | head -n $((CUR_COUNT - PREV_OFFSET))
+              PREV_OFFSET=${CUR_COUNT}
+            fi
+            NEWLOGS=$(docker logs g10k-test 2>&1 | tail -n +$((LOG_OFFSET + 1)))
+            if echo "${NEWLOGS}" | grep -q "Atomically deploying"; then
+              echo "PASS: deployment succeeded"
+              exit 0
+            fi
+            if echo "${NEWLOGS}" | grep -q "Atomic swap failed\|g10k failed for branch"; then
+              echo "FAIL: deployment failed"
+              exit 1
+            fi
+            echo "  ... $((i * 10))s elapsed, waiting..."
+            sleep 10
+          done
+          echo "FAIL: deployment timed out after 3 minutes"
+          docker logs g10k-test
+          exit 1
 
       - name: Cleanup
         if: always()
