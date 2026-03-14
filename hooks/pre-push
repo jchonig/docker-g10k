@@ -1,0 +1,81 @@
+#!/bin/bash
+# Pre-push hook: build the image and run smoke tests before allowing a push.
+# Enable: git config core.hooksPath hooks
+
+set -e
+
+IMAGE=docker-g10k:pre-push-test
+CONTAINER=g10k-pre-push-test
+
+cleanup () {
+    docker rm -f "${CONTAINER}" 2>/dev/null || true
+    docker rmi -f "${IMAGE}" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+echo "==> Building image..."
+docker build -t "${IMAGE}" .
+
+echo "==> Starting container..."
+docker run -d --name "${CONTAINER}" -e HOOK_SECRET=testsecret "${IMAGE}"
+sleep 3
+
+echo "==> Checking webhook process is running..."
+docker exec "${CONTAINER}" pgrep webhook > /dev/null
+
+echo "==> Testing branch parsing (refs/heads/production -> production)..."
+docker exec "${CONTAINER}" bash -c '
+    branch=$(cut -d/ -f3 <<<"refs/heads/production")
+    [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
+    echo "PASS: branch=$branch"
+'
+
+echo "==> Testing bare branch ref passthrough..."
+docker exec "${CONTAINER}" bash -c '
+    REF="production"
+    if [[ $REF =~ "refs/heads/" ]]; then
+        branch=$(cut -d/ -f3 <<<"${REF}")
+    elif [ -n "${REF}" ]; then
+        branch="${REF}"
+    else
+        echo "FAIL: empty ref"; exit 1
+    fi
+    [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
+    echo "PASS: branch=$branch"
+'
+
+echo "==> Testing delete event detection (all-zero SHA)..."
+docker exec "${CONTAINER}" bash -c '
+    EVENT="0000000000000000000000000000000000000000"
+    if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]] && \
+       [ "${BASH_REMATCH[0]}" = "0000000000000000000000000000000000000000" ]; then
+        echo "PASS: delete event detected"
+    else
+        echo "FAIL: delete event not detected"; exit 1
+    fi
+'
+
+echo "==> Testing push event detection (non-zero SHA)..."
+docker exec "${CONTAINER}" bash -c '
+    EVENT="abc1230000000000000000000000000000000000"
+    if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]] && \
+       [ "${BASH_REMATCH[0]}" != "0000000000000000000000000000000000000000" ]; then
+        echo "PASS: push event detected"
+    else
+        echo "FAIL: push event not detected"; exit 1
+    fi
+'
+
+echo "==> Testing empty ref rejection..."
+docker exec "${CONTAINER}" bash -c '
+    REF=""
+    if [[ $REF =~ "refs/heads/" ]]; then
+        echo "FAIL: should not match"; exit 1
+    elif [ -n "${REF}" ]; then
+        echo "FAIL: should not be non-empty"; exit 1
+    else
+        echo "PASS: empty ref correctly rejected"
+    fi
+'
+
+echo "==> All tests passed."

@@ -7,7 +7,7 @@ ENV \
 WORKDIR /src/
 RUN \
     echo "*** install build packages ***" && \
-    apk add --no-cache curl git rsync tar unzip && \
+    apk add --no-cache curl git tar unzip && \
     echo "*** install g10k ****" && \
         cd /src && \
     git clone https://github.com/xorpaul/g10k.git && \
@@ -28,7 +28,7 @@ WORKDIR /tmp
 # Install apprise and dependencies
 RUN \
     echo "**** install packages ****" && \
-        apk add --no-cache git apprise openssh-client
+        apk add --no-cache apprise git openssh-client rsync
 
 COPY root /
 COPY --from=build /usr/local/bin/g10k /usr/local/bin/g10k

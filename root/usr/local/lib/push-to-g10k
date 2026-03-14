@@ -38,21 +38,32 @@ deploy_branch () {
     local branch="${1}"
     local live="${BASEDIR}/${branch}"
     local staging="${STAGINGBASE}/${branch}"
+    local timestamp=$(date +%Y%m%d%H%M%S)
+    local newdir="${STAGINGBASE}/${branch}.${timestamp}"
 
     mkdir -p "${STAGINGBASE}"
 
-    # Clean up any leftover staging dir from a previous failed run
-    rm -rf "${staging}"
+    # Clean up any leftover staging dirs from previous failed runs
+    rm -rf "${STAGINGBASE}/${branch}."*
 
-    # Seed staging with hardlinks from current live content to minimise g10k work
-    if [ -d "${live}" ]; then
-        echo "Seeding ${staging} from ${live}"
-        rsync -a --link-dest="${live}/" "${live}/" "${staging}/"
+    # Seed staging with hardlinks from current live content
+    local current
+    current=$(readlink "${live}" 2>/dev/null)
+    if [ -n "${current}" ] && [ -d "${current}" ]; then
+        echo "Seeding ${newdir} from ${current}"
+        /usr/bin/rsync -a --link-dest="${current}/" "${current}/" "${newdir}/"
+    elif [ -d "${live}" ] && [ ! -L "${live}" ]; then
+        # First run: live exists as a real directory, not yet a symlink
+        echo "Seeding ${newdir} from ${live} (real dir, first run)"
+        /usr/bin/rsync -a --link-dest="${live}/" "${live}/" "${newdir}/"
     else
-        mkdir -p "${staging}"
+        mkdir -p "${newdir}"
     fi
 
-    # Write r10k/g10k config pointing at staging basedir
+    # Write g10k config pointing at the new versioned directory's parent
+    # g10k will deploy into ${STAGINGBASE}/${branch} so we symlink newdir there
+    ln -s "${newdir}" "${staging}"
+
     cat << EOF > "$r10kconf"
 :cachedir: '${CACHEDIR}'
 :sources:
@@ -63,22 +74,32 @@ EOF
 
     /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
     local rc=$?
+    rm -f "${staging}"
 
     if [ $rc -ne 0 ]; then
         echo "g10k failed for branch ${branch}, aborting deploy" >&2
-        rm -rf "${staging}"
+        rm -rf "${newdir}"
         return $rc
     fi
 
-    # Atomically replace live with staging via mv -T (single rename(2) syscall)
-    echo "Atomically deploying ${staging} to ${live}"
-    mv -T "${staging}" "${live}"
+    # Atomically replace the live symlink using a temp symlink + mv -T
+    local tmplnk
+    tmplnk=$(mktemp -u "${BASEDIR}/.staging.${branch}.XXXXXX")
+    ln -s "${newdir}" "${tmplnk}"
+    mv -T "${tmplnk}" "${live}"
     local mv_rc=$?
 
     if [ $mv_rc -ne 0 ]; then
         echo "Atomic swap failed for branch ${branch}" >&2
-        rm -rf "${staging}"
+        rm -f "${tmplnk}"
+        rm -rf "${newdir}"
         return $mv_rc
+    fi
+
+    # Clean up the old versioned directory
+    if [ -n "${current}" ] && [ "${current}" != "${newdir}" ]; then
+        echo "Removing old environment ${current}"
+        rm -rf "${current}"
     fi
 
     return 0

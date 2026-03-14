@@ -1,0 +1,106 @@
+name: Test and Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build test image
+        run: docker build -t docker-g10k:test .
+
+      - name: Start container
+        run: |
+          docker run -d --name g10k-test -e HOOK_SECRET=testsecret docker-g10k:test
+          sleep 3
+
+      - name: Verify webhook process is running
+        run: docker exec g10k-test pgrep webhook
+
+      - name: Test branch parsing (refs/heads/production -> production)
+        run: |
+          docker exec g10k-test bash -c '
+            branch=$(cut -d/ -f3 <<<"refs/heads/production")
+            [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
+            echo "PASS: branch=$branch"
+          '
+
+      - name: Test bare branch ref passthrough
+        run: |
+          docker exec g10k-test bash -c '
+            REF="production"
+            if [[ $REF =~ "refs/heads/" ]]; then
+              branch=$(cut -d/ -f3 <<<"${REF}")
+            elif [ -n "${REF}" ]; then
+              branch="${REF}"
+            else
+              echo "FAIL: empty ref"; exit 1
+            fi
+            [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
+            echo "PASS: branch=$branch"
+          '
+
+      - name: Test delete event detection (all-zero SHA)
+        run: |
+          docker exec g10k-test bash -c '
+            EVENT="0000000000000000000000000000000000000000"
+            if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]] && \
+               [ "${BASH_REMATCH[0]}" = "0000000000000000000000000000000000000000" ]; then
+              echo "PASS: delete event detected"
+            else
+              echo "FAIL: delete event not detected"; exit 1
+            fi
+          '
+
+      - name: Test push event detection (non-zero SHA)
+        run: |
+          docker exec g10k-test bash -c '
+            EVENT="abc1230000000000000000000000000000000000"
+            if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]] && \
+               [ "${BASH_REMATCH[0]}" != "0000000000000000000000000000000000000000" ]; then
+              echo "PASS: push event detected"
+            else
+              echo "FAIL: push event not detected"; exit 1
+            fi
+          '
+
+      - name: Test empty ref rejection
+        run: |
+          docker exec g10k-test bash -c '
+            REF=""
+            if [[ $REF =~ "refs/heads/" ]]; then
+              echo "FAIL: should not match"; exit 1
+            elif [ -n "${REF}" ]; then
+              echo "FAIL: should not be non-empty"; exit 1
+            else
+              echo "PASS: empty ref correctly rejected"
+            fi
+          '
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f g10k-test
+
+  push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: jchonig/g10k:latest

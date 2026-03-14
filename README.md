@@ -89,6 +89,61 @@ Host git.server.adddress.com
 	UserKnownHostsFile /dev/null
 ```
 
+# Development
+
+## Running tests locally
+
+A pre-push git hook is provided that builds the image and runs smoke tests
+before allowing a push. To enable it:
+
+```
+git config core.hooksPath hooks
+```
+
+The hook will build the image, start a container, run all tests, and clean up
+automatically. A failed test aborts the push.
+
+## CI/CD
+
+A GitHub Actions workflow (`.github/workflows/test.yml`) runs the same tests on
+every push and pull request. The Docker Hub image is only built and pushed after
+all tests pass, and only on pushes to `master`.
+
+To enable the Docker Hub push, two secrets must be added to the GitHub
+repository and a Docker Hub access token must be created.
+
+### Create a Docker Hub access token
+
+1. Log in to [hub.docker.com](https://hub.docker.com)
+2. Click your avatar (top right) → **Account Settings**
+3. **Security** → **New Access Token**
+4. Give it a description (e.g. `github-docker-g10k`), set permissions to **Read & Write**
+5. Click **Generate** and copy the token — it will not be shown again
+
+### Add secrets to GitHub
+
+Go to the GitHub repository → **Settings** → **Secrets and variables** →
+**Actions** → **New repository secret** and add each of the following:
+
+| Secret               | Value                        |
+| ------               | -----                        |
+| `DOCKERHUB_USERNAME` | Your Docker Hub username     |
+| `DOCKERHUB_TOKEN`    | The access token created above |
+
+If you have multiple Docker Hub repositories under the same account, these
+secrets can be set at the organization level instead (Settings →
+Secrets and variables → Actions, on the organization page) and shared
+across all repositories.
+
+### Disable Docker Hub automated builds
+
+Docker Hub automated builds must be **disabled** for this repository so that
+the image is only published via the GitHub Action after tests pass.
+
+1. In Docker Hub, go to the repository → **Builds**
+2. Click **Configure Automated Builds**
+3. Toggle automated builds **off** or unlink the GitHub source
+
 ## Notification of hook completion
 
 This container contains [apprise](https://github.com/caronc/apprise)
