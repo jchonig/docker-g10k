@@ -7,7 +7,7 @@ ENV \
 WORKDIR /src/
 RUN \
     echo "*** install build packages ***" && \
-    apk add --no-cache curl tar git unzip && \
+    apk add --no-cache curl git rsync tar unzip && \
     echo "*** install g10k ****" && \
         cd /src && \
     git clone https://github.com/xorpaul/g10k.git && \

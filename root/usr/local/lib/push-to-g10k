@@ -6,6 +6,7 @@ EVENT="${3}"
 
 CACHEDIR=/etc/puppetlabs/code/cache
 BASEDIR=/etc/puppetlabs/code/environments
+STAGINGBASE=/etc/puppetlabs/code/environments-staging
 
 r10kconf="$(mktemp)"
 trap "rm -f ${r10kconf}" 0 1 2 3 13 15
@@ -16,15 +17,15 @@ notify () {
     local event
 
     if [ -n "${3}" ]; then
-	event="${3} "
+        event="${3} "
     fi
 
     if [ -f ./.apprise.yml -a -x /usr/bin/apprise ]; then
         echo "Sending notification with apprise ${rc} ${branch} ${3}'"
         if [ ${rc} -eq 0 ]; then
-	    local title="G10K ${event}SUCCESS"
+            local title="G10K ${event}SUCCESS"
         else
-	    local title="G10 ${event}FAILED: ${rc}"
+            local title="G10 ${event}FAILED: ${rc}"
         fi
         /usr/bin/apprise --config ${PWD}/.apprise.yml --title "${title}" --body "Branch: ${branch}"
     elif [ -x ./notify ]; then
@@ -33,16 +34,55 @@ notify () {
     fi
 }
 
-cat << EOF > $r10kconf
-# The location to use for storing cached Git repos
-:cachedir: '${CACHEDIR}'
+deploy_branch () {
+    local branch="${1}"
+    local live="${BASEDIR}/${branch}"
+    local staging="${STAGINGBASE}/${branch}"
 
-# A list of git repositories to create
+    mkdir -p "${STAGINGBASE}"
+
+    # Clean up any leftover staging dir from a previous failed run
+    rm -rf "${staging}"
+
+    # Seed staging with hardlinks from current live content to minimise g10k work
+    if [ -d "${live}" ]; then
+        echo "Seeding ${staging} from ${live}"
+        rsync -a --link-dest="${live}/" "${live}/" "${staging}/"
+    else
+        mkdir -p "${staging}"
+    fi
+
+    # Write r10k/g10k config pointing at staging basedir
+    cat << EOF > "$r10kconf"
+:cachedir: '${CACHEDIR}'
 :sources:
   :main:
     remote: '${REMOTE}'
-    basedir: '${BASEDIR}'
+    basedir: '${STAGINGBASE}'
 EOF
+
+    /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
+    local rc=$?
+
+    if [ $rc -ne 0 ]; then
+        echo "g10k failed for branch ${branch}, aborting deploy" >&2
+        rm -rf "${staging}"
+        return $rc
+    fi
+
+    # Atomically replace live with staging via mv -T (single rename(2) syscall)
+    echo "Atomically deploying ${staging} to ${live}"
+    mv -T "${staging}" "${live}"
+    local mv_rc=$?
+
+    if [ $mv_rc -ne 0 ]; then
+        echo "Atomic swap failed for branch ${branch}" >&2
+        rm -rf "${staging}"
+        return $mv_rc
+    fi
+
+    return 0
+}
 
 if [[ $REF =~ 'refs/heads/' ]]; then
     branch=$(cut -d/ -f3 <<<"${REF}")
@@ -53,7 +93,8 @@ else
     exit 1
 fi
 
-# Gitlab hooks return after as the third argument.  If it is all zeros, this is a delete
+# Gitlab hooks return the after commit as the third argument.
+# If it is all zeros, this is a delete event.
 if [[ $EVENT =~ ^[[:xdigit:]]{40}$ ]]; then
     case ${BASH_REMATCH[0]} in
         "0000000000000000000000000000000000000000")
@@ -69,11 +110,11 @@ fi
 
 case ${event} in
     ""|"push")
-        /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
+        deploy_branch "${branch}"
         notify "${?}" "${branch}" "${event}"
-      ;;
+        ;;
     "delete")
-        rm -rf "${BASEDIR}/${branch}"
+        rm -rf "${BASEDIR}/${branch}" "${STAGINGBASE}/${branch}"
         notify "${?}" "${branch}" "${event}"
         ;;
     *)
