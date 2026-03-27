@@ -43,12 +43,15 @@ deploy_branch () {
 
     mkdir -p "${STAGINGBASE}"
 
-    # Clean up any leftover staging dirs from previous failed runs
-    rm -rf "${STAGINGBASE}/${branch}."*
-
     # Seed staging with hardlinks from current live content
     local current
     current=$(readlink "${live}" 2>/dev/null)
+
+    # Clean up any leftover staging dirs from previous failed runs,
+    # but not the directory the live symlink currently points to
+    for old in "${STAGINGBASE}/${branch}."*; do
+        [ "${old}" != "${current}" ] && rm -rf "${old}"
+    done
     if [ -n "${current}" ] && [ -d "${current}" ]; then
         echo "Seeding ${newdir} from ${current}"
         /usr/bin/rsync -a --link-dest="${current}/" "${current}/" "${newdir}/"
