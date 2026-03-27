@@ -17,6 +17,7 @@ echo "==> Building image..."
 docker build -t "${IMAGE}" .
 
 echo "==> Starting container..."
+docker rm -f "${CONTAINER}" 2>/dev/null || true
 docker run -d --name "${CONTAINER}" \
     -e HOOK_SECRET=testsecret \
     -p 9000:9000 \
