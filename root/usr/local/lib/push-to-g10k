@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/with-contenv bash
 
 REF="${1}"
 REMOTE="${2}"
@@ -23,9 +23,9 @@ notify () {
     if [ -f ./.apprise.yml -a -x /usr/bin/apprise ]; then
         echo "Sending notification with apprise ${rc} ${branch} ${3}'"
         if [ ${rc} -eq 0 ]; then
-            local title="G10K ${event}SUCCESS"
+            local title="${TITLE} ${event}SUCCESS"
         else
-            local title="G10 ${event}FAILED: ${rc}"
+            local title="${TITLE} ${event}FAILED: ${rc}"
         fi
         /usr/bin/apprise --config ${PWD}/.apprise.yml --title "${title}" --body "Branch: ${branch}"
     elif [ -x ./notify ]; then

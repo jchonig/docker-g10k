@@ -19,6 +19,7 @@ RUN \
 FROM --platform=linux/amd64 jchonig/webhook
 
 ENV \
+	TITLE=G10k \
         HOOK_SECRET= \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
         HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \
