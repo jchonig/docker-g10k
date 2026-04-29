@@ -65,7 +65,7 @@ deploy_branch () {
 
     # Write g10k config pointing at the new versioned directory's parent
     # g10k will deploy into ${STAGINGBASE}/${branch} so we symlink newdir there
-    ln -s "${newdir}" "${staging}"
+    ln -s "$(basename "${newdir}")" "${staging}"
 
     cat << EOF > "$r10kconf"
 :cachedir: '${CACHEDIR}'
@@ -88,7 +88,7 @@ EOF
     # Atomically replace the live symlink using a temp symlink + mv -T
     local tmplnk
     tmplnk=$(mktemp -u "${BASEDIR}/.staging.${branch}.XXXXXX")
-    ln -s "${newdir}" "${tmplnk}"
+    ln -s "../$(basename "${STAGINGBASE}")/$(basename "${newdir}")" "${tmplnk}"
     echo "Atomically deploying ${branch} from ${newdir}"
     mv -T "${tmplnk}" "${live}"
     local mv_rc=$?
