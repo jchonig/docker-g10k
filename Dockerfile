@@ -19,10 +19,10 @@ RUN \
 FROM --platform=linux/amd64 jchonig/webhook
 
 ENV \
-	TITLE=G10k \
         HOOK_SECRET= \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
         HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \
+        PUPPET_SERVER= \
 	TZ=UTC
 
 WORKDIR /tmp
@@ -30,7 +30,7 @@ WORKDIR /tmp
 # Install apprise and dependencies
 RUN \
     echo "**** install packages ****" && \
-        apk add --no-cache apprise git openssh-client rsync
+        apk add --no-cache apprise curl git openssh-client rsync
 
 COPY root /
 COPY --from=build /usr/local/bin/g10k /usr/local/bin/g10k

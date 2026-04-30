@@ -61,13 +61,15 @@ services:
 | PUID=1000            | for UserID - see below for explanation  |
 | PGID=1000            | for GroupID - see below for explanation |
 | TZ=UTC               | Specify a timezone to use EG UTC        |
+| PUPPET_SERVER=       | FQDN of the Puppet server (e.g. `puppet8.home.honig.net`); enables environment cache flushing after each successful deploy |
 
 ## Volume Mappings (-v)
 
-| Volume               | Function                                 |
-| ------               | --------                                 |
-| /config              | All the config files reside here         |
-| /etc/puppetlabs/code | Where generated puppet environments live |
+| Volume                       | Function                                 |
+| ------                       | --------                                 |
+| /config                      | All the config files reside here         |
+| /etc/puppetlabs/code         | Where generated puppet environments live |
+| /etc/puppetlabs/puppet/ssl   | Puppet SSL directory; required for environment cache flushing (see below) |
 
 # Application Setup
 
@@ -143,6 +145,35 @@ the image is only published via the GitHub Action after tests pass.
 1. In Docker Hub, go to the repository → **Builds**
 2. Click **Configure Automated Builds**
 3. Toggle automated builds **off** or unlink the GitHub source
+
+## Puppet environment cache flushing
+
+After a successful g10k deploy, the container can notify the Puppet server to
+flush its compiled catalog cache for the deployed environment. This ensures
+agents pick up the new code immediately rather than serving stale catalogs.
+
+To enable this, set `PUPPET_SERVER` to the FQDN of the Puppet server and mount
+its SSL directory read-only:
+
+```yaml
+environment:
+  PUPPET_SERVER: puppet8.home.honig.net
+volumes:
+  - /etc/puppetlabs/puppet/ssl:/etc/puppetlabs/puppet/ssl:ro
+```
+
+The container uses the Puppet server's own certificate (named after
+`PUPPET_SERVER`) to authenticate to the admin API:
+
+| File                                                          | Purpose          |
+| ----                                                          | -------          |
+| `/etc/puppetlabs/puppet/ssl/certs/ca.pem`                    | CA certificate   |
+| `/etc/puppetlabs/puppet/ssl/certs/<PUPPET_SERVER>.pem`        | Client certificate |
+| `/etc/puppetlabs/puppet/ssl/private_keys/<PUPPET_SERVER>.pem` | Private key      |
+
+If any of these files are absent, the flush is skipped with a warning and the
+deploy still succeeds. The notification title prefix is derived from the
+hostname portion of `PUPPET_SERVER` (e.g. `puppet8`).
 
 ## Notification of hook completion
 

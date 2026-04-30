@@ -7,6 +7,10 @@ EVENT="${3}"
 CACHEDIR=/etc/puppetlabs/code/cache
 BASEDIR=/etc/puppetlabs/code/environments
 STAGINGBASE=/etc/puppetlabs/code/environments-staging
+PUPPET_SSLDIR=/etc/puppetlabs/puppet/ssl
+
+TITLE="${PUPPET_SERVER%%.*}"
+: "${TITLE:=G10K}"
 
 r10kconf="$(mktemp)"
 trap "rm -f ${r10kconf}" 0 1 2 3 13 15
@@ -109,6 +113,38 @@ EOF
     return 0
 }
 
+flush_environment_cache () {
+    local branch="${1}"
+
+    [ -z "${PUPPET_SERVER}" ] && return 0
+
+    local cert="${PUPPET_SSLDIR}/certs/${PUPPET_SERVER}.pem"
+    local key="${PUPPET_SSLDIR}/private_keys/${PUPPET_SERVER}.pem"
+    local cacert="${PUPPET_SSLDIR}/certs/ca.pem"
+
+    if [ ! -f "${cert}" ] || [ ! -f "${key}" ] || [ ! -f "${cacert}" ]; then
+        echo "Puppet SSL keys not found under ${PUPPET_SSLDIR}, skipping environment cache flush" >&2
+        return 0
+    fi
+
+    echo "Flushing puppetserver environment cache for ${branch}"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        --cert "${cert}" \
+        --key "${key}" \
+        --cacert "${cacert}" \
+        -X DELETE \
+        "https://${PUPPET_SERVER}:8140/puppet-admin-api/v1/environment-cache?environment=${branch}")
+
+    if [ "${http_code}" != "204" ]; then
+        echo "Failed to flush environment cache for ${branch}: HTTP ${http_code}" >&2
+        return 1
+    fi
+
+    echo "Environment cache flushed for ${branch}"
+    return 0
+}
+
 if [[ $REF =~ 'refs/heads/' ]]; then
     branch=$(cut -d/ -f3 <<<"${REF}")
 elif [ -n "${REF}" ]; then
@@ -136,7 +172,9 @@ fi
 case ${event} in
     ""|"push")
         deploy_branch "${branch}"
-        notify "${?}" "${branch}" "${event}"
+        deploy_rc=${?}
+        [ ${deploy_rc} -eq 0 ] && flush_environment_cache "${branch}"
+        notify "${deploy_rc}" "${branch}" "${event}"
         ;;
     "delete")
         rm -rf "${BASEDIR}/${branch}" "${STAGINGBASE}/${branch}"
