@@ -2,6 +2,8 @@
 A container running [g10k](https://github.com/xorpaul/g10k) and
 [webhook](https://github.com/adnanh/webhook).
 
+Image hosted at: `ghcr.io/ghcr.io/jchonig/g10k`
+
 The purpose is to catch webhook posts from a git server and run g10k to
 build puppet environments.
 
@@ -9,7 +11,7 @@ This is roughly derrived from
 [camptocamp/docker-g10k-webhook](https://github.com/camptocamp/docker-g10k-webhook),
 but runs a container based on [s6](https://skarnet.org/software/s6/overview.html).
 
-This image is layered on [jchonig/webhook](https://github.com/jchonig/g10k).
+This image is layered on [jchonig/webhook](https://github.com/ghcr.io/jchonig/g10k).
 
 # Usage
 
@@ -21,7 +23,7 @@ docker create \
   -e TZ=Europe/London \
   --expose 9000 \
   --restart unless-stopped \
-  jchonig/g10k
+  ghcr.io/jchonig/g10k
 ```
 
 ### docker-compose
@@ -33,7 +35,7 @@ Compatible with docker-compose v2 schemas.
 version: "3"
 services:
   monit:
-    image: jchonig/g10k
+    image: ghcr.io/jchonig/g10k
     container_name: g10k
     environment:
       TZ: Europe/London
