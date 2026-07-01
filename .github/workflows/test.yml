@@ -8,12 +8,13 @@ on:
     types: [dependency-updated]
   schedule:
     - cron: '0 10 * * 0'
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest\n    env:\n      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build test image
         run: docker build -t docker-g10k:test .
@@ -198,30 +199,30 @@ jobs:
 
   push:
     needs: test
-    runs-on: ubuntu-latest\n    env:\n      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ghcr.io/jchonig/g10k
@@ -231,9 +232,15 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  keepalive:
+    if: github.event_name == 'schedule'
+    uses: jchonig/workflows/.github/workflows/keepalive.yml@main
+    permissions:
+      actions: write
