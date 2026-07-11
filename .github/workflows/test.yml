@@ -33,7 +33,8 @@ jobs:
       - name: Test branch parsing (refs/heads/production -> production)
         run: |
           docker exec g10k-test bash -c '
-            branch=$(cut -d/ -f3 <<<"refs/heads/production")
+            REF="refs/heads/production"
+            branch="${REF#refs/heads/}"
             [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
             echo "PASS: branch=$branch"
           '
@@ -42,8 +43,8 @@ jobs:
         run: |
           docker exec g10k-test bash -c '
             REF="production"
-            if [[ $REF =~ "refs/heads/" ]]; then
-              branch=$(cut -d/ -f3 <<<"${REF}")
+            if [[ $REF =~ ^refs/heads/ ]]; then
+              branch="${REF#refs/heads/}"
             elif [ -n "${REF}" ]; then
               branch="${REF}"
             else
@@ -51,6 +52,17 @@ jobs:
             fi
             [ "$branch" = "production" ] || { echo "FAIL: got $branch"; exit 1; }
             echo "PASS: branch=$branch"
+          '
+
+      - name: Test git-flow style branch parsing (refs/heads/fix/foo -> fix/foo, env fix_foo)
+        run: |
+          docker exec g10k-test bash -c '
+            REF="refs/heads/fix/foo"
+            branch="${REF#refs/heads/}"
+            env_name=$(echo "${branch}" | sed "s/[^A-Za-z0-9]/_/g")
+            [ "$branch" = "fix/foo" ] || { echo "FAIL branch: got $branch"; exit 1; }
+            [ "$env_name" = "fix_foo" ] || { echo "FAIL env_name: got $env_name"; exit 1; }
+            echo "PASS: branch=$branch env_name=$env_name"
           '
 
       - name: Test delete event detection (all-zero SHA)

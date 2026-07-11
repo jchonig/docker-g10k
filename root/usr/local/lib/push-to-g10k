@@ -39,7 +39,8 @@ notify () {
 }
 
 deploy_branch () {
-    local branch="${1}"
+    local git_branch="${1}"
+    local branch="${2}"
     local live="${BASEDIR}/${branch}"
     local staging="${STAGINGBASE}/${branch}"
     local timestamp=$(date +%Y%m%d%H%M%S)
@@ -79,7 +80,7 @@ deploy_branch () {
     basedir: '${STAGINGBASE}'
 EOF
 
-    /usr/local/bin/g10k -config "$r10kconf" -branch "$branch"
+    /usr/local/bin/g10k -config "$r10kconf" -branch "$git_branch"
     local rc=$?
     rm -rf "${staging}"
 
@@ -145,14 +146,21 @@ flush_environment_cache () {
     return 0
 }
 
-if [[ $REF =~ 'refs/heads/' ]]; then
-    branch=$(cut -d/ -f3 <<<"${REF}")
+if [[ $REF =~ ^refs/heads/ ]]; then
+    branch="${REF#refs/heads/}"
 elif [ -n "${REF}" ]; then
     branch="${REF}"
 else
     echo "g10k empty reference ${REF}"
     exit 1
 fi
+
+# g10k sanitizes the branch name into an environment name (replacing
+# non-alphanumeric characters with underscores) before creating its
+# environment directory. Branches with their own "/" (e.g. git-flow style
+# "fix/foo") need the same sanitization here so our own staging/live paths
+# and the environment-cache flush agree with what g10k actually deployed.
+env_name=$(echo "${branch}" | sed 's/[^A-Za-z0-9]/_/g')
 
 # Gitlab hooks return the after commit as the third argument.
 # If it is all zeros, this is a delete event.
@@ -171,14 +179,14 @@ fi
 
 case ${event} in
     ""|"push")
-        deploy_branch "${branch}"
+        deploy_branch "${branch}" "${env_name}"
         deploy_rc=${?}
-        [ ${deploy_rc} -eq 0 ] && flush_environment_cache "${branch}"
-        notify "${deploy_rc}" "${branch}" "${event}"
+        [ ${deploy_rc} -eq 0 ] && flush_environment_cache "${env_name}"
+        notify "${deploy_rc}" "${env_name}" "${event}"
         ;;
     "delete")
-        rm -rf "${BASEDIR}/${branch}" "${STAGINGBASE}/${branch}"
-        notify "${?}" "${branch}" "${event}"
+        rm -rf "${BASEDIR}/${env_name}" "${STAGINGBASE}/${env_name}"
+        notify "${?}" "${env_name}" "${event}"
         ;;
     *)
         echo "ignoring ${event} event"
