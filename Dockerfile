@@ -1,5 +1,7 @@
 # check=skip=SecretsUsedInArgOrEnv
-FROM --platform=linux/amd64 golang:alpine AS build
+ARG PLATFORM=linux/amd64
+
+FROM --platform=$PLATFORM golang:alpine AS build
 
 ENV \
         CGO_ENABLED=0 \
@@ -16,7 +18,7 @@ RUN \
         git checkout v${G10K_VERSION} && \
         BUILDTIME=$(date -u '+%Y-%m-%d_%H:%M:%S') && go build -ldflags "-s -w -X main.buildtime=$BUILDTIME" -o /usr/local/bin/g10k
 
-FROM --platform=linux/amd64 ghcr.io/jchonig/webhook
+FROM --platform=$PLATFORM ghcr.io/jchonig/webhook
 
 ENV \
         HOOK_SECRET= \
