@@ -1,26 +1,12 @@
 # check=skip=SecretsUsedInArgOrEnv
 ARG PLATFORM=linux/amd64
 
-FROM --platform=$PLATFORM golang:alpine AS build
-
-ENV \
-        CGO_ENABLED=0 \
-	G10K_VERSION=0.10.0
-
-WORKDIR /src/
-RUN \
-    echo "*** install build packages ***" && \
-    apk add --no-cache curl git tar unzip && \
-    echo "*** install g10k ****" && \
-        cd /src && \
-    git clone https://github.com/xorpaul/g10k.git && \
-        cd g10k && \
-        git checkout v${G10K_VERSION} && \
-        BUILDTIME=$(date -u '+%Y-%m-%d_%H:%M:%S') && go build -ldflags "-s -w -X main.buildtime=$BUILDTIME" -o /usr/local/bin/g10k
-
 FROM --platform=$PLATFORM ghcr.io/jchonig/webhook
 
+ARG PLATFORM
+
 ENV \
+        G10K_VERSION=0.10.0 \
         HOOK_SECRET= \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
         HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \
@@ -34,8 +20,17 @@ RUN \
     echo "**** install packages ****" && \
         apk add --no-cache apprise curl git openssh-client rsync
 
+RUN \
+    echo "**** install g10k ****" && \
+        G10K_OS=${PLATFORM%%/*} && \
+        G10K_ARCH=${PLATFORM##*/} && \
+        G10K_TARBALL="g10k_${G10K_VERSION}_${G10K_OS}_${G10K_ARCH}.tar.gz" && \
+        curl -fsSLO "https://github.com/voxpupuli/g10k/releases/download/v${G10K_VERSION}/${G10K_TARBALL}" && \
+        curl -fsSL "https://github.com/voxpupuli/g10k/releases/download/v${G10K_VERSION}/checksums.txt" | grep " ${G10K_TARBALL}\$" | sha256sum -c - && \
+        tar -xzf "${G10K_TARBALL}" -C /usr/local/bin g10k && \
+        rm "${G10K_TARBALL}"
+
 COPY root /
-COPY --from=build /usr/local/bin/g10k /usr/local/bin/g10k
 
 EXPOSE 9000
 
