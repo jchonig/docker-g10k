@@ -5,7 +5,7 @@ FROM --platform=$PLATFORM golang:alpine AS build
 
 ENV \
         CGO_ENABLED=0 \
-	G10K_VERSION=0.9.10
+	G10K_VERSION=0.10.0
 
 WORKDIR /src/
 RUN \
