@@ -1,4 +1,5 @@
 # docker-g10k
+
 A container running [g10k](https://github.com/xorpaul/g10k) and
 [webhook](https://github.com/adnanh/webhook).
 
@@ -7,17 +8,19 @@ Image hosted at: `ghcr.io/jchonig/g10k`
 The purpose is to catch webhook posts from a git server and run g10k to
 build puppet environments.
 
-This is roughly derrived from
+This is roughly derived from
 [camptocamp/docker-g10k-webhook](https://github.com/camptocamp/docker-g10k-webhook),
-but runs a container based on [s6](https://skarnet.org/software/s6/overview.html).
+but runs a container based on
+[s6](https://skarnet.org/software/s6/overview.html).
 
-This image is layered on [jchonig/webhook](https://github.com/jchonig/docker-webhook).
+This image is layered on
+[jchonig/webhook](https://github.com/jchonig/docker-webhook).
 
-# Usage
+## Usage
 
-## docker
+### docker
 
-```
+```sh
 docker create \
   --name=g10k \
   -e TZ=Europe/London \
@@ -26,11 +29,11 @@ docker create \
   ghcr.io/jchonig/g10k
 ```
 
-### docker-compose
+#### docker-compose
 
 Compatible with docker-compose v2 schemas.
 
-```
+```yaml
 ---
 version: "3"
 services:
@@ -42,72 +45,74 @@ services:
       HOOK_SECRET: MYSHAREDSECRET
     volumes:
       - </path/to/appdata/config>:/config
-	  - /etc/puppetlabs/code:/etc/puppetlabs/code
+      - /etc/puppetlabs/code:/etc/puppetlabs/code
     expose:
       - 9000
     restart: unless-stopped
 ```
 
-# Parameters
+## Parameters
 
-## Ports (--expose)
+### Ports (--expose)
 
-| Volume | Function    |
-| ------ | --------    |
-| 9000   | Webook port |
+| Port | Function     |
+| ---- | ------------ |
+| 9000 | Webhook port |
 
-## Environment Variables (-e)
+### Environment Variables (-e)
 
-| Env                  | Function                                |
-| ---                  | --------                                |
-| PUID=1000            | for UserID - see below for explanation  |
-| PGID=1000            | for GroupID - see below for explanation |
-| TZ=UTC               | Specify a timezone to use EG UTC        |
-| PUPPET_SERVER=       | FQDN of the Puppet server (e.g. `puppet8.home.honig.net`); enables environment cache flushing after each successful deploy |
+| Env            | Function                                          |
+| -------------- | ------------------------------------------------- |
+| PUID=1000      | for UserID - see below for explanation            |
+| PGID=1000      | for GroupID - see below for explanation           |
+| TZ=UTC         | Specify a timezone to use EG UTC                  |
+| PUPPET_SERVER= | FQDN of the Puppet server; enables cache flushing |
 
-## Volume Mappings (-v)
+See [Puppet environment cache flushing](#puppet-environment-cache-flushing).
 
-| Volume                       | Function                                 |
-| ------                       | --------                                 |
-| /config                      | All the config files reside here         |
-| /etc/puppetlabs/code         | Where generated puppet environments live |
-| /etc/puppetlabs/puppet/ssl   | Puppet SSL directory; required for environment cache flushing (see below) |
+### Volume Mappings (-v)
 
-# Application Setup
+| Volume                     | Function                                 |
+| -------------------------- | ---------------------------------------- |
+| /config                    | All the config files reside here         |
+| /etc/puppetlabs/code       | Where generated puppet environments live |
+| /etc/puppetlabs/puppet/ssl | Puppet SSL; needed for cache flushing    |
 
-  * Environment variables can also be passed in a file named `env` in
-    the `config` directory. This file is sourced by the shell.
-	
-## ssh configuration
+## Application Setup
+
+* Environment variables can also be passed in a file named `env` in
+  the `config` directory. This file is sourced by the shell.
+
+### ssh configuration
 
 SSH configuration should be stored in the `/config/.ssh`,
-    including a `/config/.ssh/config` file which specifies which keys
-    to use for each git server.
+including a `/config/.ssh/config` file which specifies which keys
+to use for each git server.
 
-```
+```ssh-config
 Host git.server.adddress.com
-	Compression no
-	IdentityFile %d/.ssh/id_rsa
-	IdentitiesOnly yes
-	StrictHostKeyChecking no
-	UserKnownHostsFile /dev/null
+  Compression no
+  IdentityFile %d/.ssh/id_rsa
+  IdentitiesOnly yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
 ```
 
-# Development
+## Development
 
-## Running tests locally
+### Running tests locally
 
 A pre-push git hook is provided that builds the image and runs smoke tests
 before allowing a push. To enable it:
 
-```
+```sh
 git config core.hooksPath hooks
 ```
 
 The hook will build the image, start a container, run all tests, and clean up
 automatically. A failed test aborts the push.
 
-## CI/CD
+### CI/CD
 
 A GitHub Actions workflow (`.github/workflows/test.yml`) runs the same tests on
 every push and pull request. The Docker Hub image is only built and pushed after
@@ -116,22 +121,23 @@ all tests pass, and only on pushes to `master`.
 To enable the Docker Hub push, two secrets must be added to the GitHub
 repository and a Docker Hub access token must be created.
 
-### Create a Docker Hub access token
+#### Create a Docker Hub access token
 
 1. Log in to [hub.docker.com](https://hub.docker.com)
 2. Click your avatar (top right) → **Account Settings**
 3. **Security** → **New Access Token**
-4. Give it a description (e.g. `github-docker-g10k`), set permissions to **Read & Write**
+4. Give it a description (e.g. `github-docker-g10k`), set permissions to
+   **Read & Write**
 5. Click **Generate** and copy the token — it will not be shown again
 
-### Add secrets to GitHub
+#### Add secrets to GitHub
 
 Go to the GitHub repository → **Settings** → **Secrets and variables** →
 **Actions** → **New repository secret** and add each of the following:
 
-| Secret               | Value                        |
-| ------               | -----                        |
-| `DOCKERHUB_USERNAME` | Your Docker Hub username     |
+| Secret               | Value                          |
+| -------------------- | ------------------------------ |
+| `DOCKERHUB_USERNAME` | Your Docker Hub username       |
 | `DOCKERHUB_TOKEN`    | The access token created above |
 
 If you have multiple Docker Hub repositories under the same account, these
@@ -139,7 +145,7 @@ secrets can be set at the organization level instead (Settings →
 Secrets and variables → Actions, on the organization page) and shared
 across all repositories.
 
-### Disable Docker Hub automated builds
+#### Disable Docker Hub automated builds
 
 Docker Hub automated builds must be **disabled** for this repository so that
 the image is only published via the GitHub Action after tests pass.
@@ -148,7 +154,7 @@ the image is only published via the GitHub Action after tests pass.
 2. Click **Configure Automated Builds**
 3. Toggle automated builds **off** or unlink the GitHub source
 
-## Puppet environment cache flushing
+### Puppet environment cache flushing
 
 After a successful g10k deploy, the container can notify the Puppet server to
 flush its compiled catalog cache for the deployed environment. This ensures
@@ -165,23 +171,23 @@ volumes:
 ```
 
 The container uses the Puppet server's own certificate (named after
-`PUPPET_SERVER`) to authenticate to the admin API:
+`PUPPET_SERVER`) to authenticate to the admin API. These files are
+relative to `/etc/puppetlabs/puppet/ssl`:
 
-| File                                                          | Purpose          |
-| ----                                                          | -------          |
-| `/etc/puppetlabs/puppet/ssl/certs/ca.pem`                    | CA certificate   |
-| `/etc/puppetlabs/puppet/ssl/certs/<PUPPET_SERVER>.pem`        | Client certificate |
-| `/etc/puppetlabs/puppet/ssl/private_keys/<PUPPET_SERVER>.pem` | Private key      |
+| File                               | Purpose            |
+| ---------------------------------- | ------------------ |
+| `certs/ca.pem`                     | CA certificate     |
+| `certs/<PUPPET_SERVER>.pem`        | Client certificate |
+| `private_keys/<PUPPET_SERVER>.pem` | Private key        |
 
 If any of these files are absent, the flush is skipped with a warning and the
 deploy still succeeds. The notification title prefix is derived from the
 hostname portion of `PUPPET_SERVER` (e.g. `puppet8`).
 
-## Notification of hook completion
+### Notification of hook completion
 
 This container contains [apprise](https://github.com/caronc/apprise)
 which can send notifications via almost all notification services.
 
 To send notifications on completions of g10k runs, create a
 `/config/.apprise.yml` that lists the urls to notify.
-
