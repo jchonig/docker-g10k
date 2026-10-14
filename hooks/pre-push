@@ -152,6 +152,7 @@ HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
 echo "PASS: gitlab hook returned HTTP 200, waiting for deployment..."
 # Poll new log lines for success or failure (allow 3 min)
 PREV_OFFSET=${LOG_OFFSET}
+DEPLOYED=
 for i in $(seq 1 18); do
     # Print any new container log lines so progress is visible
     CUR_COUNT=$(docker logs "${CONTAINER}" 2>&1 | wc -l | tr -d ' ')
@@ -162,7 +163,8 @@ for i in $(seq 1 18); do
     NEWLOGS=$(docker logs "${CONTAINER}" 2>&1 | tail -n +$((LOG_OFFSET + 1)))
     if echo "${NEWLOGS}" | grep -q "Atomically deploying"; then
         echo "PASS: deployment succeeded"
-        exit 0
+        DEPLOYED=1
+        break
     fi
     if echo "${NEWLOGS}" | grep -q "Atomic swap failed\|g10k failed for branch"; then
         echo "FAIL: deployment failed"
@@ -171,6 +173,11 @@ for i in $(seq 1 18); do
     echo "  ... $((i * 10))s elapsed, waiting..."
     sleep 10
 done
-echo "FAIL: deployment timed out after 3 minutes"
-docker logs "${CONTAINER}"
-exit 1
+if [ -z "${DEPLOYED}" ]; then
+    echo "FAIL: deployment timed out after 3 minutes"
+    docker logs "${CONTAINER}"
+    exit 1
+fi
+
+echo "==> Testing failed deploy keeps the live environment..."
+test/failed-deploy.sh "${CONTAINER}"

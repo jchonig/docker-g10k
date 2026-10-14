@@ -18,7 +18,7 @@ WORKDIR /tmp
 # Install apprise and dependencies
 RUN \
     echo "**** install packages ****" && \
-        apk add --no-cache apprise curl git openssh-client rsync
+        apk add --no-cache apprise curl flock git openssh-client rsync
 
 RUN \
     echo "**** install g10k ****" && \

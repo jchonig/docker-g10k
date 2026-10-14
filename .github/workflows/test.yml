@@ -205,6 +205,9 @@ jobs:
           docker logs g10k-test
           exit 1
 
+      - name: Test failed deploy keeps the live environment
+        run: test/failed-deploy.sh g10k-test
+
       - name: Cleanup
         if: always()
         run: docker rm -f g10k-test

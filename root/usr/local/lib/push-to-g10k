@@ -43,20 +43,37 @@ deploy_branch () {
     local branch="${2}"
     local live="${BASEDIR}/${branch}"
     local staging="${STAGINGBASE}/${branch}"
-    local timestamp=$(date +%Y%m%d%H%M%S)
-    local newdir="${STAGINGBASE}/${branch}.${timestamp}"
+    local newdir
 
     mkdir -p "${STAGINGBASE}"
 
-    # Seed staging with hardlinks from current live content
-    local current
-    current=$(readlink "${live}" 2>/dev/null)
+    # Serialize deploys of the same branch; overlapping runs would remove
+    # each other's staging directories. The lock is held until exit.
+    local lockfd
+    exec {lockfd}> "${STAGINGBASE}/.${branch}.lock"
+    flock "${lockfd}"
+
+    # Seed staging with hardlinks from current live content. The live
+    # symlink is relative, so resolve it to an absolute path; only do so
+    # when it is a symlink, as readlink -f also resolves missing paths.
+    local current=
+    if [ -L "${live}" ]; then
+        current=$(readlink -f "${live}" 2>/dev/null)
+    fi
 
     # Clean up any leftover staging dirs from previous failed runs,
-    # but not the directory the live symlink currently points to
+    # but not the directory the live symlink currently points to.
+    # Compare basenames in case STAGINGBASE is reached through a symlink.
     for old in "${STAGINGBASE}/${branch}."*; do
-        [ "${old}" != "${current}" ] && rm -rf "${old}"
+        [ -e "${old}" ] || continue
+        [ -n "${current}" ] && [ "$(basename "${old}")" = "$(basename "${current}")" ] && continue
+        echo "Removing leftover staging directory ${old}"
+        rm -rf "${old}"
     done
+
+    # Unique even when deploys of a branch start within the same second
+    newdir=$(mktemp -d "${STAGINGBASE}/${branch}.$(date +%Y%m%d%H%M%S).XXXXXX") || return 1
+    chmod 755 "${newdir}"
     if [ -n "${current}" ] && [ -d "${current}" ]; then
         echo "Seeding ${newdir} from ${current}"
         /usr/bin/rsync -a --link-dest="${current}/" "${current}/" "${newdir}/"
@@ -106,7 +123,8 @@ EOF
     fi
 
     # Clean up the old versioned directory
-    if [ -n "${current}" ] && [ "${current}" != "${newdir}" ]; then
+    if [ -n "${current}" ] && [ -d "${current}" ] && \
+           [ "$(basename "${current}")" != "$(basename "${newdir}")" ]; then
         echo "Removing old environment ${current}"
         rm -rf "${current}"
     fi
