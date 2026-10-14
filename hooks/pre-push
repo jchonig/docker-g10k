@@ -4,6 +4,18 @@
 
 set -e
 
+# Skip the tests when the push only deletes remote refs. Git passes one
+# "<local ref> <local sha> <remote ref> <remote sha>" line per ref; a
+# delete has an all-zero local sha.
+only_deletes=1
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [[ ${local_sha} =~ ^0+$ ]] || only_deletes=
+done
+if [ -n "${only_deletes}" ]; then
+    echo "==> Push only deletes refs, skipping tests"
+    exit 0
+fi
+
 IMAGE=docker-g10k:pre-push-test
 CONTAINER=g10k-pre-push-test
 
