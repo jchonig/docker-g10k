@@ -49,18 +49,99 @@ lock_branch () {
     flock "${lockfd}"
 }
 
+# g10k sanitizes a branch name into an environment name (replacing
+# non-alphanumeric characters with underscores) before creating its
+# environment directory. Branches with their own "/" (e.g. git-flow style
+# "fix/foo") need the same sanitization here so our own staging/live paths
+# and the environment-cache flush agree with what g10k actually deployed.
+env_name_of () {
+    echo "${1}" | sed 's/[^A-Za-z0-9]/_/g'
+}
+
+# Remove the live symlink (or a pre-symlink real directory), then every
+# versioned staging directory, including the one it pointed to. Keep the
+# lock file: a deploy may already be waiting on it. Hold the lock first.
+remove_environment () {
+    local branch="${1}"
+
+    rm -rf "${BASEDIR}/${branch}" \
+       "${STAGINGBASE}/${branch}" \
+       "${STAGINGBASE}/${branch}."*
+}
+
 delete_branch () {
     local branch="${1}"
 
     lock_branch "${branch}"
-
-    # Remove the live symlink (or a pre-symlink real directory), then
-    # every versioned staging directory, including the one it pointed to.
-    # Keep the lock file: a deploy may already be waiting on it.
     echo "Deleting environment ${branch}"
-    rm -rf "${BASEDIR}/${branch}" \
-       "${STAGINGBASE}/${branch}" \
-       "${STAGINGBASE}/${branch}."*
+    remove_environment "${branch}"
+}
+
+# Remove environments, and leftover staging directories, whose branch no
+# longer exists on ${REMOTE}. Deploys come from CI, which sends no event
+# when a branch is deleted. PRUNE_ENVIRONMENTS is "yes" to prune,
+# "dry-run" (the default) to only log what would be pruned, or "no".
+prune_environments () {
+    local deployed="${1}"
+    local mode="${PRUNE_ENVIRONMENTS:-dry-run}"
+
+    case "${mode}" in
+        yes|dry-run) ;;
+        no) return 0 ;;
+        *)
+            echo "Unknown PRUNE_ENVIRONMENTS=${mode}, not pruning" >&2
+            return 0
+            ;;
+    esac
+
+    # An unreachable remote must not look like every branch was deleted
+    local heads
+    if ! heads=$(git ls-remote --heads "${REMOTE}") || [ -z "${heads}" ]; then
+        echo "Could not list branches on ${REMOTE}, not pruning" >&2
+        return 0
+    fi
+
+    local -A keep=(["${deployed}"]=1)
+    local sha ref
+    while read -r sha ref; do
+        keep["$(env_name_of "${ref#refs/heads/}")"]=1
+    done <<< "${heads}"
+
+    # Environment names never contain ".", so strip the staging suffix
+    # (.<timestamp>.<random>). The glob skips dot files: locks, temp links.
+    local -A stale=()
+    local path name
+    for path in "${BASEDIR}"/* "${STAGINGBASE}"/*; do
+        [ -e "${path}" ] || [ -L "${path}" ] || continue
+        name=$(basename "${path}")
+        name="${name%%.*}"
+        [ -n "${keep[${name}]}" ] || stale["${name}"]=1
+    done
+
+    local pruned=()
+    while read -r name; do
+        [ -n "${name}" ] || continue
+        if [ "${mode}" = dry-run ]; then
+            echo "Would prune environment ${name} (PRUNE_ENVIRONMENTS=dry-run)"
+            continue
+        fi
+        # Skip, rather than wait for, a branch a deploy is working on. The
+        # subshell releases the lock when it exits.
+        if ! (
+            exec {lockfd}> "${STAGINGBASE}/.${name}.lock"
+            flock -n "${lockfd}" || exit 1
+            remove_environment "${name}"
+        ); then
+            echo "Environment ${name} is locked by a deploy, not pruning it"
+            continue
+        fi
+        echo "Pruned environment ${name}"
+        pruned+=("${name}")
+    done < <(printf '%s\n' "${!stale[@]}" | sort)
+
+    if [ ${#pruned[@]} -gt 0 ]; then
+        notify 0 "$(IFS=,; echo "${pruned[*]}")" "prune"
+    fi
 }
 
 deploy_branch () {
@@ -184,6 +265,9 @@ flush_environment_cache () {
     return 0
 }
 
+# Stop here when sourced, so tests can call the functions directly
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
+
 if [[ $REF =~ ^refs/heads/ ]]; then
     branch="${REF#refs/heads/}"
 elif [ -n "${REF}" ]; then
@@ -193,12 +277,7 @@ else
     exit 1
 fi
 
-# g10k sanitizes the branch name into an environment name (replacing
-# non-alphanumeric characters with underscores) before creating its
-# environment directory. Branches with their own "/" (e.g. git-flow style
-# "fix/foo") need the same sanitization here so our own staging/live paths
-# and the environment-cache flush agree with what g10k actually deployed.
-env_name=$(echo "${branch}" | sed 's/[^A-Za-z0-9]/_/g')
+env_name=$(env_name_of "${branch}")
 
 # Gitlab hooks return the after commit as the third argument.
 # If it is all zeros, this is a delete event.
@@ -221,6 +300,7 @@ case ${event} in
         deploy_rc=${?}
         [ ${deploy_rc} -eq 0 ] && flush_environment_cache "${env_name}"
         notify "${deploy_rc}" "${env_name}" "${event}"
+        [ ${deploy_rc} -eq 0 ] && prune_environments "${env_name}"
         ;;
     "delete")
         delete_branch "${env_name}"

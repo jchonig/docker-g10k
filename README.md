@@ -61,14 +61,17 @@ services:
 
 ### Environment Variables (-e)
 
-| Env            | Function                                          |
-| -------------- | ------------------------------------------------- |
-| PUID=1000      | for UserID - see below for explanation            |
-| PGID=1000      | for GroupID - see below for explanation           |
-| TZ=UTC         | Specify a timezone to use EG UTC                  |
-| PUPPET_SERVER= | FQDN of the Puppet server; enables cache flushing |
+| Env                        | Function                                   |
+| -------------------------- | ------------------------------------------ |
+| PUID=1000                  | for UserID - see below for explanation     |
+| PGID=1000                  | for GroupID - see below for explanation    |
+| TZ=UTC                     | Specify a timezone to use EG UTC           |
+| PUPPET_SERVER=             | Puppet server FQDN; enables cache flushing |
+| PRUNE_ENVIRONMENTS=dry-run | Prune deleted branches: yes, dry-run or no |
 
-See [Puppet environment cache flushing](#puppet-environment-cache-flushing).
+See [Puppet environment cache flushing](#puppet-environment-cache-flushing)
+and [Pruning environments of deleted
+branches](#pruning-environments-of-deleted-branches).
 
 ### Volume Mappings (-v)
 
@@ -183,6 +186,27 @@ relative to `/etc/puppetlabs/puppet/ssl`:
 If any of these files are absent, the flush is skipped with a warning and the
 deploy still succeeds. The notification title prefix is derived from the
 hostname portion of `PUPPET_SERVER` (e.g. `puppet8`).
+
+### Pruning environments of deleted branches
+
+Deploys triggered from CI get no event when a branch is deleted, so after
+each successful deploy the container lists the branches on the remote it
+deployed from. It removes any environment, and any leftover staging
+directory, whose branch no longer exists there. The environment just
+deployed is always kept.
+
+`PRUNE_ENVIRONMENTS` controls this:
+
+* `dry-run` (the default) logs `Would prune environment <name>` for each
+  environment that would be removed, and removes nothing
+* `yes` removes them and sends one notification listing all of them
+* `no` turns pruning off
+
+Nothing is pruned if the remote's branches can't be listed, and an
+environment is skipped while a deploy of it is in progress. Pruning
+assumes every environment comes from the one remote being deployed, so
+don't share `/etc/puppetlabs/code` between containers that deploy
+different control repositories.
 
 ### Notification of hook completion
 

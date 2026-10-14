@@ -11,6 +11,7 @@ ENV \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
         HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \
         PUPPET_SERVER= \
+        PRUNE_ENVIRONMENTS=dry-run \
 	TZ=UTC
 
 WORKDIR /tmp
