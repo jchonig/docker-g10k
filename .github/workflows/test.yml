@@ -208,6 +208,9 @@ jobs:
       - name: Test failed deploy keeps the live environment
         run: test/failed-deploy.sh g10k-test
 
+      - name: Test branch delete removes its environment
+        run: test/delete-branch.sh g10k-test
+
       - name: Cleanup
         if: always()
         run: docker rm -f g10k-test

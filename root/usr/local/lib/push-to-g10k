@@ -38,6 +38,31 @@ notify () {
     fi
 }
 
+# Serialize deploys and deletes of the same branch; overlapping runs would
+# remove each other's staging directories. The lock is held until exit.
+lock_branch () {
+    local branch="${1}"
+    local lockfd
+
+    mkdir -p "${STAGINGBASE}"
+    exec {lockfd}> "${STAGINGBASE}/.${branch}.lock"
+    flock "${lockfd}"
+}
+
+delete_branch () {
+    local branch="${1}"
+
+    lock_branch "${branch}"
+
+    # Remove the live symlink (or a pre-symlink real directory), then
+    # every versioned staging directory, including the one it pointed to.
+    # Keep the lock file: a deploy may already be waiting on it.
+    echo "Deleting environment ${branch}"
+    rm -rf "${BASEDIR}/${branch}" \
+       "${STAGINGBASE}/${branch}" \
+       "${STAGINGBASE}/${branch}."*
+}
+
 deploy_branch () {
     local git_branch="${1}"
     local branch="${2}"
@@ -45,13 +70,7 @@ deploy_branch () {
     local staging="${STAGINGBASE}/${branch}"
     local newdir
 
-    mkdir -p "${STAGINGBASE}"
-
-    # Serialize deploys of the same branch; overlapping runs would remove
-    # each other's staging directories. The lock is held until exit.
-    local lockfd
-    exec {lockfd}> "${STAGINGBASE}/.${branch}.lock"
-    flock "${lockfd}"
+    lock_branch "${branch}"
 
     # Seed staging with hardlinks from current live content. The live
     # symlink is relative, so resolve it to an absolute path; only do so
@@ -95,6 +114,7 @@ deploy_branch () {
   :main:
     remote: '${REMOTE}'
     basedir: '${STAGINGBASE}'
+    exit_if_unreachable: true
 EOF
 
     /usr/local/bin/g10k -config "$r10kconf" -branch "$git_branch"
@@ -203,7 +223,7 @@ case ${event} in
         notify "${deploy_rc}" "${env_name}" "${event}"
         ;;
     "delete")
-        rm -rf "${BASEDIR}/${env_name}" "${STAGINGBASE}/${env_name}"
+        delete_branch "${env_name}"
         notify "${?}" "${env_name}" "${event}"
         ;;
     *)

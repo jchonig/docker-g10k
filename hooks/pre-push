@@ -181,3 +181,6 @@ fi
 
 echo "==> Testing failed deploy keeps the live environment..."
 test/failed-deploy.sh "${CONTAINER}"
+
+echo "==> Testing branch delete removes its environment..."
+test/delete-branch.sh "${CONTAINER}"

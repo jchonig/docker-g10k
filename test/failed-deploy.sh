@@ -21,7 +21,7 @@ fail () {
 # Run a deploy the way the webhook does: as abc, from /config
 deploy () {
     docker exec -u abc -w /config "${CONTAINER}" \
-        /usr/local/lib/push-to-g10k refs/heads/production "${REMOTE}" push 2>&1
+        /usr/local/lib/push-to-g10k refs/heads/production "${1:-${REMOTE}}" push 2>&1
 }
 
 # Replace the production branch's Puppetfile ("good" or "broken")
@@ -88,3 +88,15 @@ has_files "${second}" || fail "new live environment ${second} is empty"
 docker exec "${CONTAINER}" test ! -e "${first}" \
     || fail "old environment ${first} was not removed"
 echo "PASS: redeploy seeded from ${first} and removed it"
+
+sleep 1
+echo "==> Deploying production from an unreachable control repo..."
+out=$(deploy file:///tmp/missing.git) || true
+echo "${out}"
+echo "${out}" | grep -q "g10k failed for branch production" \
+    || fail "deploy from unreachable control repo did not report failure"
+[ "$(live_target)" = "${second}" ] \
+    || fail "live symlink changed after failed deploy: $(live_target)"
+has_files "${second}" \
+    || fail "live environment ${second} missing or empty after failed deploy"
+echo "PASS: unreachable control repo left ${second} intact"
