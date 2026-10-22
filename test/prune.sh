@@ -157,4 +157,6 @@ for e in production keep_me; do
 done
 echo "${out}" | grep -q "^Pruned environment cron_drop$" \
     || fail "cron's prune did not reach the container log"
+echo "${out}" | grep "push-to-g10k: line [0-9]*:" \
+    && fail "cron's prune had shell errors"
 echo "PASS: cron pruned cron_drop and logged it"

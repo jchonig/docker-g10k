@@ -102,7 +102,10 @@ prune_environments () {
         return 0
     fi
 
-    local -A keep=(["${deployed}"]=1)
+    # The periodic prune has no deployed environment, and an empty key is
+    # a bad array subscript
+    local -A keep=()
+    [ -n "${deployed}" ] && keep["${deployed}"]=1
     local sha ref
     while read -r sha ref; do
         keep["$(env_name_of "${ref#refs/heads/}")"]=1
