@@ -135,3 +135,26 @@ deploy keep-me yes | grep -i "prune" || true
 gone locked_one || fail "locked_one was not pruned after its lock was released"
 has_env keep_me || fail "keep_me was pruned"
 echo "PASS: pruned locked_one once unlocked"
+
+echo "==> Pruning from cron, with no deploy, after a branch is deleted..."
+[ "$(docker exec "${CONTAINER}" cat "${STAGING}/.remote")" = "${REMOTE}" ] \
+    || fail "the last deploy did not record its remote"
+docker exec "${CONTAINER}" run-parts --test /etc/periodic/hourly \
+    | grep -q '/prune-environments$' \
+    || fail "run-parts would not run prune-environments"
+git_remote branch cron_drop production
+deploy cron_drop no > /dev/null
+has_env cron_drop || fail "cron_drop was not deployed"
+git_remote branch -D cron_drop > /dev/null
+set_prune yes
+LOG_OFFSET=$(docker logs "${CONTAINER}" 2>&1 | wc -l | tr -d ' ')
+docker exec "${CONTAINER}" /etc/periodic/hourly/prune-environments
+out=$(docker logs "${CONTAINER}" 2>&1 | tail -n +$((LOG_OFFSET + 1)))
+echo "${out}"
+gone cron_drop || fail "cron did not prune cron_drop"
+for e in production keep_me; do
+    has_env "${e}" || fail "cron pruned ${e}"
+done
+echo "${out}" | grep -q "^Pruned environment cron_drop$" \
+    || fail "cron's prune did not reach the container log"
+echo "PASS: cron pruned cron_drop and logged it"

@@ -79,8 +79,9 @@ delete_branch () {
 
 # Remove environments, and leftover staging directories, whose branch no
 # longer exists on ${REMOTE}. Deploys come from CI, which sends no event
-# when a branch is deleted. PRUNE_ENVIRONMENTS is "yes" to prune,
-# "dry-run" (the default) to only log what would be pruned, or "no".
+# when a branch is deleted, so this runs after each deploy and hourly
+# from cron (--prune). PRUNE_ENVIRONMENTS is "yes" to prune, "dry-run"
+# (the default) to only log what would be pruned, or "no".
 prune_environments () {
     local deployed="${1}"
     local mode="${PRUNE_ENVIRONMENTS:-dry-run}"
@@ -265,8 +266,32 @@ flush_environment_cache () {
     return 0
 }
 
+# The remote of the last successful deploy, for the periodic prune. A dot
+# file, so pruning never treats it as an environment.
+REMOTEFILE="${STAGINGBASE}/.remote"
+
+save_remote () {
+    printf '%s\n' "${REMOTE}" > "${REMOTEFILE}"
+}
+
+# Prune without a deploy (from cron), against the remote of the last
+# successful deploy
+prune_only () {
+    if [ ! -s "${REMOTEFILE}" ]; then
+        echo "No deploy has recorded a remote yet, not pruning"
+        return 0
+    fi
+    REMOTE=$(cat "${REMOTEFILE}")
+    prune_environments ""
+}
+
 # Stop here when sourced, so tests can call the functions directly
 [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
+
+if [ "${REF}" = "--prune" ]; then
+    prune_only
+    exit 0
+fi
 
 if [[ $REF =~ ^refs/heads/ ]]; then
     branch="${REF#refs/heads/}"
@@ -300,7 +325,10 @@ case ${event} in
         deploy_rc=${?}
         [ ${deploy_rc} -eq 0 ] && flush_environment_cache "${env_name}"
         notify "${deploy_rc}" "${env_name}" "${event}"
-        [ ${deploy_rc} -eq 0 ] && prune_environments "${env_name}"
+        if [ ${deploy_rc} -eq 0 ]; then
+            save_remote
+            prune_environments "${env_name}"
+        fi
         ;;
     "delete")
         delete_branch "${env_name}"

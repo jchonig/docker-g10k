@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# Prune environments of deleted branches, as abc from /config like the
+# webhook, logging to the container's output. Deleting a branch sends
+# no deploy, so without this they'd stay until the next deploy.
+
+cd /config || exit 1
+exec s6-setuidgid abc /usr/local/lib/push-to-g10k --prune > /proc/1/fd/1 2>&1

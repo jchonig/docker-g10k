@@ -195,6 +195,13 @@ deployed from. It removes any environment, and any leftover staging
 directory, whose branch no longer exists there. The environment just
 deployed is always kept.
 
+So that a deleted branch doesn't wait for the next deploy, the container
+also prunes hourly from cron (`/etc/periodic/hourly/prune-environments`),
+against the remote of the last successful deploy. That remote is kept in
+`/etc/puppetlabs/code/environments-staging/.remote`; until a deploy has
+recorded one, the hourly prune does nothing. Its output goes to the
+container log.
+
 `PRUNE_ENVIRONMENTS` controls this:
 
 * `dry-run` (the default) logs `Would prune environment <name>` for each
