@@ -6,7 +6,8 @@ FROM --platform=$PLATFORM ghcr.io/jchonig/webhook
 ARG PLATFORM
 
 ENV \
-        G10K_VERSION=0.10.0 \
+        G10K_VERSION=0.12.0 \
+        G10K_TIMEOUT=60 \
         HOOK_SECRET= \
         HOOK_COMMAND=/usr/local/lib/push-to-g10k \
         HOOK_ARGS="-hooks /etc/webhook/githook.yaml.tmpl -template -verbose" \

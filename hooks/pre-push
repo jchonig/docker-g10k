@@ -199,3 +199,6 @@ test/delete-branch.sh "${CONTAINER}"
 
 echo "==> Testing deploys prune environments of deleted branches..."
 test/prune.sh "${CONTAINER}"
+
+echo "==> Testing deploys set and enforce the g10k timeout..."
+test/timeout.sh "${CONTAINER}"

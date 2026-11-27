@@ -214,6 +214,9 @@ jobs:
       - name: Test deploys prune environments of deleted branches
         run: test/prune.sh g10k-test
 
+      - name: Test deploys set and enforce the g10k timeout
+        run: test/timeout.sh g10k-test
+
       - name: Cleanup
         if: always()
         run: docker rm -f g10k-test
