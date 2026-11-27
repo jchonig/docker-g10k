@@ -68,10 +68,12 @@ services:
 | TZ=UTC                     | Specify a timezone to use EG UTC           |
 | PUPPET_SERVER=             | Puppet server FQDN; enables cache flushing |
 | PRUNE_ENVIRONMENTS=dry-run | Prune deleted branches: yes, dry-run or no |
+| G10K_TIMEOUT=60            | Seconds per g10k git or Forge operation    |
 
-See [Puppet environment cache flushing](#puppet-environment-cache-flushing)
-and [Pruning environments of deleted
-branches](#pruning-environments-of-deleted-branches).
+See [Puppet environment cache flushing](#puppet-environment-cache-flushing),
+[Pruning environments of deleted
+branches](#pruning-environments-of-deleted-branches) and [g10k
+timeout](#g10k-timeout).
 
 ### Volume Mappings (-v)
 
@@ -214,6 +216,23 @@ environment is skipped while a deploy of it is in progress. Pruning
 assumes every environment comes from the one remote being deployed, so
 don't share `/etc/puppetlabs/code` between containers that deploy
 different control repositories.
+
+### g10k timeout
+
+g10k kills any git command (clone, fetch) or Forge request that runs
+longer than its `:timeout:` setting, and fails the deploy. A missing or
+zero timeout means 5 seconds, which a large control repository or a slow
+git server can exceed. The container writes `G10K_TIMEOUT` (default 60)
+into the g10k config of every deploy; unset or empty means 60. Any value
+other than a positive whole number of seconds fails the deploy before
+anything is staged.
+
+### Puppetfile syntax
+
+g10k does not understand r10k's `forge "<url>"` line. g10k 0.12.0 and
+later fail the deploy on it; earlier versions ignored it. Set a different
+Forge with `forge.baseUrl <url>` instead, or leave it out to use
+`https://forgeapi.puppetlabs.com`.
 
 ### Notification of hook completion
 

@@ -148,6 +148,28 @@ prune_environments () {
     fi
 }
 
+# Write the g10k config. g10k (0.11.0 and later) kills any git command or
+# Forge request that runs longer than :timeout: seconds, and treats a
+# missing or zero timeout as 5 seconds, so always set one.
+write_g10k_config () {
+    local timeout="${G10K_TIMEOUT:-60}"
+
+    if [[ ! ${timeout} =~ ^[0-9]+$ ]] || (( 10#${timeout} == 0 )); then
+        echo "G10K_TIMEOUT must be a positive number of seconds, got '${timeout}'" >&2
+        return 1
+    fi
+
+    cat << EOF > "$r10kconf"
+:cachedir: '${CACHEDIR}'
+:timeout: $(( 10#${timeout} ))
+:sources:
+  :main:
+    remote: '${REMOTE}'
+    basedir: '${STAGINGBASE}'
+    exit_if_unreachable: true
+EOF
+}
+
 deploy_branch () {
     local git_branch="${1}"
     local branch="${2}"
@@ -156,6 +178,9 @@ deploy_branch () {
     local newdir
 
     lock_branch "${branch}"
+
+    # Before touching staging, so a bad G10K_TIMEOUT changes nothing
+    write_g10k_config || return 1
 
     # Seed staging with hardlinks from current live content. The live
     # symlink is relative, so resolve it to an absolute path; only do so
@@ -189,18 +214,9 @@ deploy_branch () {
         mkdir -p "${newdir}"
     fi
 
-    # Write g10k config pointing at the new versioned directory's parent
+    # The g10k config points at the new versioned directory's parent:
     # g10k will deploy into ${STAGINGBASE}/${branch} so we symlink newdir there
     ln -s "$(basename "${newdir}")" "${staging}"
-
-    cat << EOF > "$r10kconf"
-:cachedir: '${CACHEDIR}'
-:sources:
-  :main:
-    remote: '${REMOTE}'
-    basedir: '${STAGINGBASE}'
-    exit_if_unreachable: true
-EOF
 
     /usr/local/bin/g10k -config "$r10kconf" -branch "$git_branch"
     local rc=$?
